@@ -1,58 +1,70 @@
-<!--?php
+<?php
+$pag_id = 'inicio';
 session_start();
+require_once "php/funcoes.php";
+require_once "php/conecta_db.php";
+requireLogin();
 
-// Verificar se o usuário está autenticado
-if (!isset($_SESSION['usuario'])) {
-    header("Location: index.php"); // Redirecionar para a página de login, se não estiver autenticado
-    exit();
-}
-
-// Dados de conexão do banco de dados
-$dbHost = "localhost";
-$dbUser = "root";
-$dbPass = "";
-$dbName = "tk_users";
-
-$dsn = "mysql:host=$dbHost;dbname=$dbName;charset=utf8mb4";
-$options = [
-    PDO::ATTR_PERSISTENT => true,
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-];
+$usuario = $_SESSION['usuario'];
 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    $primeiroNome = $_POST['primeiro-nome'];
-    $segundoNome = $_POST['segundo-nome'];
+    $primeiroNome = $_POST['primeiro_nome'];
+    $segundoNome = $_POST['segundo_nome'];
     $setor = $_POST['setor'];
     $cargo = $_POST['cargo'];
+    echo 'a';
+    var_dump($_POST);
+
 
     if (!empty($primeiroNome) && !empty($segundoNome)) {
-        $conn = new mysqli('localhost', 'root', '', 'tk_users');
-        if ($conn->connect_error) {
-            die('Falha na conexão com o banco de dados: ' . $conn->connect_error);
+        $updateQuery = "UPDATE usuarios SET primeiro_nome = '$primeiroNome', segundo_nome = '$segundoNome', , cargo = '$cargo', setor = '$setor' WHERE usuario = '$usuario'";
+        mysqli_stmt_execute(mysqli_prepare($connection, $updateQuery));
+
+        echo 'b';
+        exit();
+
+        if (mysqli_affected_rows($connection) > 0) {
+            echo "Inserção bem-sucedida!";
+        } else {
+            echo "Falha na inserção.";
         }
+        // if ($_POST['img'] === 'personalizada') {
+        //     $imagem = $_FILES['imagem'];
+        //     if ($imagem['error'] === UPLOAD_ERR_OK) {
+        //         $nomeArquivo = uniqid() . '_' . $imagem['name'];
+        //         $caminhoDestino = 'uploads/' . $nomeArquivo;
 
-        $usuario = $_SESSION['usuario'];
+        //         if (!move_uploaded_file($imagem['tmp_name'], $caminhoDestino)) {
+        //             $loginError = "Erro ao fazer o upload da imagem.";
+        //             exit();
+        //         }
 
-        $sql = "UPDATE usuarios SET primeiro_nome = '$primeiroNome', segundo_nome = '$segundoNome', setor = '$setor', cargo = '$cargo' WHERE usuario = '$usuario'";
+        //     } else {
+        //         $loginError = "Erro no carregamento da imagem: " . $imagem['error'];
+        //     }
+        //     $query = "UPDATE usuarios SET imagem = '$nomeArquivo' WHERE usuario = '$usuario'";
+        // } else {
+        //     $imagem = 'ghost/' . $_POST['img'] . '.png';
+        //     $query = "UPDATE usuarios SET imagem = '$imagem' WHERE usuario = '$usuario'";
+        // }
+        // mysqli_stmt_execute(mysqli_prepare($connection, $query));
 
-        if ($conn->query($sql) === FALSE) {
-            echo "Erro ao atualizar o registro: " . $conn->error;
-        }
+    } else {
+        $loginError = "Por favor, preencha todos os campos.";
+        exit();
     }
 }
 
 
 
 try {
-    $pdo = new PDO($dsn, $dbUser, $dbPass, $options);
     $usuario = $_SESSION['usuario'];
     $selectQuery = "SELECT * FROM usuarios WHERE usuario = '$usuario'";
-    $result = $pdo->query($selectQuery);
+    $result = mysqli_query($connection, $selectQuery);
 
-    if ($result->rowCount() > 0) {
-        $userRow = $result->fetch(PDO::FETCH_ASSOC);
+    if (mysqli_num_rows($result) > 0) {
+        $userRow = mysqli_fetch_assoc($result);
         $primeiro_nome = $userRow['primeiro_nome'];
         $segundo_nome = $userRow['segundo_nome'];
         $setor = $userRow['setor'];
@@ -65,55 +77,40 @@ try {
         $_SESSION['segundo_nome'] = $segundo_nome;
         $_SESSION['texkoins'] = $texkoins;
         $_SESSION['setor'] = $setor;
+        $_SESSION['cargo'] = $cargo;
     }
 
-    // Consulta para obter a classificação geral dos usuários
-    $leaderboardQuery = "SELECT rank, nome, texkoins, setor, imagem
-    FROM ranking_usuarios
-    ORDER BY rank
-    LIMIT 10";
-    $result = $pdo->query($leaderboardQuery);
+    // Consulta usuários
+    $leaderboardQuery = "SELECT * FROM usuarios ORDER BY texkoins DESC LIMIT 10";
+    $resultLeaderboard = mysqli_query($connection, $leaderboardQuery);
 
+    // Consulta para obter o total de texkoins do setor do usuário logado
+    $setorQuery = "SELECT total_texkoins
+            FROM ranking_setores
+            WHERE setor = '$setor'";
+    $resultSetor = mysqli_query($connection, $setorQuery);
 
-    // Consulta para obter a classificação por setor
-    $leaderboardSetorQuery = "SELECT setor, total_texkoins, dense_rank
-    FROM (
-        SELECT setor, total_texkoins, DENSE_RANK() OVER (ORDER BY total_texkoins DESC) AS dense_rank
-        FROM leaderboard_setor_view
-    ) AS subquery
-    WHERE setor = :setor";
-    $stmt = $pdo->prepare($leaderboardSetorQuery);
-    $stmt->bindParam(':setor', $setor);
-    $stmt->execute();
-    $resultSetor = $stmt->fetch(PDO::FETCH_ASSOC);
+    if ($resultSetor && mysqli_num_rows($resultSetor) > 0) {
+        $row = mysqli_fetch_assoc($resultSetor);
+        $tkSetor = $row['total_texkoins'];
+    } else {
+        $tkSetor = 0;
+    }
 
-    $totalTexkoins = $resultSetor['total_texkoins'];
-    $rank = $resultSetor['dense_rank'];
+    // Consulta tabela setor
+    $leaderboardSetorQuery = "SELECT setor, SUM(texkoins) AS total_texkoins
+           FROM usuarios
+           GROUP BY setor
+           ORDER BY total_texkoins DESC";
+    $resultSetor = mysqli_query($connection, $leaderboardSetorQuery);
 
-
-
-
-
-    $pdo = null;
-} catch (PDOException $e) {
+} catch (Exception $e) {
     echo "Erro de conexão com o banco de dados: " . $e->getMessage();
     exit();
 }
-?-->
-<!--
-=========================================================
-* Argon Dashboard 2 - v2.0.4
-=========================================================
+?>
 
-* Product Page: https://www.creative-tim.com/product/argon-dashboard
-* Copyright 2022 Creative Tim (https://www.creative-tim.com)
-* Licensed under MIT (https://www.creative-tim.com/license)
-* Coded by Creative Tim
 
-=========================================================
-
-* The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
--->
 <!DOCTYPE html>
 <html lang="pt-br">
 
@@ -136,6 +133,11 @@ try {
     <!-- CSS Files -->
     <link id="pagestyle" href="assets/css/argon-dashboard.css?v=2.0.4" rel="stylesheet" />
     <style>
+        body {
+            background-color: #f5f5f5;
+            background-image: url("data:image/svg+xml,%3Csvg width='180' height='180' viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M81.28 88H68.413l19.298 19.298L81.28 88zm2.107 0h13.226L90 107.838 83.387 88zm15.334 0h12.866l-19.298 19.298L98.72 88zm-32.927-2.207L73.586 78h32.827l.5.5 7.294 7.293L115.414 87l-24.707 24.707-.707.707L64.586 87l1.207-1.207zm2.62.207L74 80.414 79.586 86H68.414zm16 0L90 80.414 95.586 86H84.414zm16 0L106 80.414 111.586 86h-11.172zm-8-6h11.173L98 85.586 92.414 80zM82 85.586L87.586 80H76.414L82 85.586zM17.414 0L.707 16.707 0 17.414V0h17.414zM4.28 0L0 12.838V0h4.28zm10.306 0L2.288 12.298 6.388 0h8.198zM180 17.414L162.586 0H180v17.414zM165.414 0l12.298 12.298L173.612 0h-8.198zM180 12.838L175.72 0H180v12.838zM0 163h16.413l.5.5 7.294 7.293L25.414 172l-8 8H0v-17zm0 10h6.613l-2.334 7H0v-7zm14.586 7l7-7H8.72l-2.333 7h8.2zM0 165.414L5.586 171H0v-5.586zM10.414 171L16 165.414 21.586 171H10.414zm-8-6h11.172L8 170.586 2.414 165zM180 163h-16.413l-7.794 7.793-1.207 1.207 8 8H180v-17zm-14.586 17l-7-7h12.865l2.333 7h-8.2zM180 173h-6.613l2.334 7H180v-7zm-21.586-2l5.586-5.586 5.586 5.586h-11.172zM180 165.414L174.414 171H180v-5.586zm-8 5.172l5.586-5.586h-11.172l5.586 5.586zM152.933 25.653l1.414 1.414-33.94 33.942-1.416-1.416 33.943-33.94zm1.414 127.28l-1.414 1.414-33.942-33.94 1.416-1.416 33.94 33.943zm-127.28 1.414l-1.414-1.414 33.94-33.942 1.416 1.416-33.943 33.94zm-1.414-127.28l1.414-1.414 33.942 33.94-1.416 1.416-33.94-33.943zM0 85c2.21 0 4 1.79 4 4s-1.79 4-4 4v-8zm180 0c-2.21 0-4 1.79-4 4s1.79 4 4 4v-8zM94 0c0 2.21-1.79 4-4 4s-4-1.79-4-4h8zm0 180c0-2.21-1.79-4-4-4s-4 1.79-4 4h8z' fill='%231d1924' fill-opacity='0.06' fill-rule='evenodd'/%3E%3C/svg%3E");
+        }
+
         .setor-t {
             padding-left: 20px;
         }
@@ -147,56 +149,11 @@ try {
 </head>
 
 <body class="g-sidenav-show bg-gray-100">
-    <div class="position-absolute w-100 min-height-300 top-0"
-        style="background-image: url('tltx-padrao.png'); background-position-y: 50%;">
+    <div class="position-absolute w-100 min-height-100 top-0"
+        style="background-image: url('fundo-pattern.png'); background-position-y: 50%;">
         <span class="mask bg-primary opacity-6"></span>
     </div>
-    <aside
-        class="sidenav bg-white navbar navbar-vertical navbar-expand-xs border-0 border-radius-xl my-3 fixed-start ms-4 "
-        id="sidenav-main">
-        <div class="sidenav-header">
-            <i class="fas fa-times p-3 cursor-pointer text-secondary opacity-5 position-absolute end-0 top-0 d-none d-xl-none"
-                aria-hidden="true" id="iconSidenav"></i>
-            <a class="navbar-brand m-0" target="_blank">
-                <img src="assets/images/tltx-logo-roxo-t.png" class="navbar-brand-img h-100" alt="main_logo">
-                <span class="ms-1 font-weight-bold">TEXKOINS</span>
-            </a>
-        </div>
-        <hr class="horizontal dark mt-0">
-        <div class="collapse navbar-collapse  w-auto " id="sidenav-collapse-main">
-            <ul class="navbar-nav">
-                <li class="nav-item">
-                    <a class="nav-link active" href="dashboard.php">
-                        <div
-                            class="icon icon-shape icon-sm border-radius-md text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="ni ni-spaceship text-primary text-sm opacity-10"></i>
-                        </div>
-                        <span class="nav-link-text ms-1">Início</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link " href="../pages/tables.html">
-                        <div
-                            class="icon icon-shape icon-sm border-radius-md text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="fa fa-line-chart text-primary text-sm opacity-10"></i>
-                        </div>
-                        <span class="nav-link-text ms-1">Ranking</span>
-                    </a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link " href="../pages/tables.html">
-                        <div
-                            class="icon icon-shape icon-sm border-radius-md text-center me-2 d-flex align-items-center justify-content-center">
-                            <i class="fa fa-user-circle text-primary text-sm opacity-10"></i>
-                        </div>
-                        <span class="nav-link-text ms-1">Conta</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="sidenav-footer mx-3 ">
-        </div>
-    </aside>
+    <?php include 'php/aside.php' ?>
     <div class="main-content position-relative max-height-vh-100 h-100">
         <!-- Navbar -->
         <nav
@@ -277,7 +234,7 @@ try {
                                         <div class="form-group">
                                             <label for="example-text-input" class="form-control-label">primeiro
                                                 nome</label>
-                                            <input id="primeiro-nome" name="primeiro-nome" class="form-control"
+                                            <input id="primeiro_nome" name="primeiro_nome" class="form-control"
                                                 type="text" value="<?php echo $primeiro_nome ?>">
                                         </div>
                                     </div>
@@ -285,7 +242,7 @@ try {
                                         <div class="form-group">
                                             <label for="example-text-input" class="form-control-label">segundo
                                                 nome</label>
-                                            <input class="form-control" id="segundo-nome" name="segundo-nome"
+                                            <input class="form-control" id="segundo_nome" name="segundo_nome"
                                                 type="text" value="<?php echo $segundo_nome ?>">
                                         </div>
                                     </div>
@@ -310,6 +267,9 @@ try {
                                                 <option>Marketing</option>
                                                 <option>Compliance</option>
                                                 <option>Recursos Humanos</option>
+                                                <option>Alianças</option>
+                                                <option>Administrativo</option>
+                                                <option>Comercial</option>
                                             </select>
                                         </div>
                                     </div>
@@ -335,7 +295,7 @@ try {
                                     <span class="font-weight-normal">Você é do setor... </span>
                                     <?php echo $setor ?>!
                                 </h6>
-                                
+
                                 <table class="mx-auto">
                                     <tr>
                                         <td class="text-left h6 font-weight-300">RANKING</td>

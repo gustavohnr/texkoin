@@ -1,45 +1,41 @@
 <?php
 session_start();
+require_once "php/funcoes.php";
+require_once "php/conecta_db.php";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $primeiroNome = $_POST['primeiro_nome'];
-    $segundoNome = $_POST['segundo_nome'];
-    $setor = $_POST['setor'];
-    $imagem = $_FILES['imagem'];
-
-    if (!empty($primeiroNome) && !empty($segundoNome) && isset($imagem['tmp_name'])) {
-        $conn = new mysqli('localhost', 'root', '', 'tk_users');
-        if ($conn->connect_error) {
-            die('Falha na conexão com o banco de dados: ' . $conn->connect_error);
-        }
-
-        $usuario = $_SESSION['usuario'];
-
-        if ($imagem['error'] === UPLOAD_ERR_OK) {
-            $nomeArquivo = uniqid() . '_' . $imagem['name'];
-            $caminhoDestino = 'uploads/' . $nomeArquivo;
-
-            if (move_uploaded_file($imagem['tmp_name'], $caminhoDestino)) {
-                $sql = "UPDATE usuarios SET primeiro_nome = '$primeiroNome', segundo_nome = '$segundoNome', setor = '$setor', imagem = '$nomeArquivo' WHERE usuario = '$usuario'";
-
-                if ($conn->query($sql) === TRUE) {
-                    echo "Registro atualizado com sucesso.";
-                    header("Location: dashboard.php");
-                } else {
-                    echo "Erro ao atualizar o registro: " . $conn->error;
-                }
+    if (autenticarAD($_POST['usuario'], $_POST['senha'])) {
+        $_SESSION['usuario'] = $_POST['usuario'];
+        $query = "SELECT primeiro_nome FROM usuarios WHERE usuario = ?";
+        echo 'query';
+        $statement = mysqli_prepare($connection, $query);
+        mysqli_stmt_bind_param($statement, 's', $_SESSION['usuario']);
+        mysqli_stmt_execute($statement);
+        mysqli_stmt_bind_result($statement, $primeiro_nome);
+        echo 'mysqli';
+        if (mysqli_stmt_fetch($statement)) {
+            if ($primeiro_nome) {
+                $_SESSION['usuario'] = $_POST['usuario'];
+                header("Location: dashboard.php");
+                exit();
             } else {
-                echo "Erro ao fazer o upload da imagem.";
+                header("Location: registro.php");
+                exit();
             }
         } else {
-            echo "Erro no carregamento da imagem: " . $imagem['error'];
+            $insertQuery = "INSERT INTO usuarios (usuario, texkoins) VALUES (?, 0.0)";
+            $insertStatement = mysqli_prepare($connection, $insertQuery);
+            mysqli_stmt_bind_param($insertStatement, 's', $_SESSION['usuario']);
+            mysqli_stmt_execute($insertStatement);
+            header("Location: registro.php");
+            exit();
         }
-        $conn->close();
     } else {
-        echo "Por favor, preencha todos os campos.";
+        $loginError = "Credenciais inválidas. Por favor, tente novamente.";
     }
 }
 ?>
+
 <!DOCTYPE html>
 <html lang="pt-br">
 
@@ -47,14 +43,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Texkoins | Registro</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.8.2/css/bulma.css" rel="stylesheet" />
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bulma-social@1/bin/bulma-social.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/css.gg/icons/all.css" rel="stylesheet" />
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.css" />
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/fancybox/3.5.7/jquery.fancybox.min.js"></script>
+    <title>Texkoins | Login</title>
     <script src="https://kit.fontawesome.com/4619b7f556.js" crossorigin="anonymous"></script>
     <style>
         .btn-login {
@@ -80,29 +73,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             background-color: #ffffff;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 304 304' width='304' height='304'%3E%3Cpath fill='%239C92AC' fill-opacity='0.28' d='M44.1 224a5 5 0 1 1 0 2H0v-2h44.1zm160 48a5 5 0 1 1 0 2H82v-2h122.1zm57.8-46a5 5 0 1 1 0-2H304v2h-42.1zm0 16a5 5 0 1 1 0-2H304v2h-42.1zm6.2-114a5 5 0 1 1 0 2h-86.2a5 5 0 1 1 0-2h86.2zm-256-48a5 5 0 1 1 0 2H0v-2h12.1zm185.8 34a5 5 0 1 1 0-2h86.2a5 5 0 1 1 0 2h-86.2zM258 12.1a5 5 0 1 1-2 0V0h2v12.1zm-64 208a5 5 0 1 1-2 0v-54.2a5 5 0 1 1 2 0v54.2zm48-198.2V80h62v2h-64V21.9a5 5 0 1 1 2 0zm16 16V64h46v2h-48V37.9a5 5 0 1 1 2 0zm-128 96V208h16v12.1a5 5 0 1 1-2 0V210h-16v-76.1a5 5 0 1 1 2 0zm-5.9-21.9a5 5 0 1 1 0 2H114v48H85.9a5 5 0 1 1 0-2H112v-48h12.1zm-6.2 130a5 5 0 1 1 0-2H176v-74.1a5 5 0 1 1 2 0V242h-60.1zm-16-64a5 5 0 1 1 0-2H114v48h10.1a5 5 0 1 1 0 2H112v-48h-10.1zM66 284.1a5 5 0 1 1-2 0V274H50v30h-2v-32h18v12.1zM236.1 176a5 5 0 1 1 0 2H226v94h48v32h-2v-30h-48v-98h12.1zm25.8-30a5 5 0 1 1 0-2H274v44.1a5 5 0 1 1-2 0V146h-10.1zm-64 96a5 5 0 1 1 0-2H208v-80h16v-14h-42.1a5 5 0 1 1 0-2H226v18h-16v80h-12.1zm86.2-210a5 5 0 1 1 0 2H272V0h2v32h10.1zM98 101.9V146H53.9a5 5 0 1 1 0-2H96v-42.1a5 5 0 1 1 2 0zM53.9 34a5 5 0 1 1 0-2H80V0h2v34H53.9zm60.1 3.9V66H82v64H69.9a5 5 0 1 1 0-2H80V64h32V37.9a5 5 0 1 1 2 0zM101.9 82a5 5 0 1 1 0-2H128V37.9a5 5 0 1 1 2 0V82h-28.1zm16-64a5 5 0 1 1 0-2H146v44.1a5 5 0 1 1-2 0V18h-26.1zm102.2 270a5 5 0 1 1 0 2H98v14h-2v-16h124.1zM242 149.9V160h16v34h-16v62h48v48h-2v-46h-48v-66h16v-30h-16v-12.1a5 5 0 1 1 2 0zM53.9 18a5 5 0 1 1 0-2H64V2H48V0h18v18H53.9zm112 32a5 5 0 1 1 0-2H192V0h50v2h-48v48h-28.1zm-48-48a5 5 0 0 1-9.8-2h2.07a3 3 0 1 0 5.66 0H178v34h-18V21.9a5 5 0 1 1 2 0V32h14V2h-58.1zm0 96a5 5 0 1 1 0-2H137l32-32h39V21.9a5 5 0 1 1 2 0V66h-40.17l-32 32H117.9zm28.1 90.1a5 5 0 1 1-2 0v-76.51L175.59 80H224V21.9a5 5 0 1 1 2 0V82h-49.59L146 112.41v75.69zm16 32a5 5 0 1 1-2 0v-99.51L184.59 96H300.1a5 5 0 0 1 3.9-3.9v2.07a3 3 0 0 0 0 5.66v2.07a5 5 0 0 1-3.9-3.9H185.41L162 121.41v98.69zm-144-64a5 5 0 1 1-2 0v-3.51l48-48V48h32V0h2v50H66v55.41l-48 48v2.69zM50 53.9v43.51l-48 48V208h26.1a5 5 0 1 1 0 2H0v-65.41l48-48V53.9a5 5 0 1 1 2 0zm-16 16V89.41l-34 34v-2.82l32-32V69.9a5 5 0 1 1 2 0zM12.1 32a5 5 0 1 1 0 2H9.41L0 43.41V40.6L8.59 32h3.51zm265.8 18a5 5 0 1 1 0-2h18.69l7.41-7.41v2.82L297.41 50H277.9zm-16 160a5 5 0 1 1 0-2H288v-71.41l16-16v2.82l-14 14V210h-28.1zm-208 32a5 5 0 1 1 0-2H64v-22.59L40.59 194H21.9a5 5 0 1 1 0-2H41.41L66 216.59V242H53.9zm150.2 14a5 5 0 1 1 0 2H96v-56.6L56.6 162H37.9a5 5 0 1 1 0-2h19.5L98 200.6V256h106.1zm-150.2 2a5 5 0 1 1 0-2H80v-46.59L48.59 178H21.9a5 5 0 1 1 0-2H49.41L82 208.59V258H53.9zM34 39.8v1.61L9.41 66H0v-2h8.59L32 40.59V0h2v39.8zM2 300.1a5 5 0 0 1 3.9 3.9H3.83A3 3 0 0 0 0 302.17V256h18v48h-2v-46H2v42.1zM34 241v63h-2v-62H0v-2h34v1zM17 18H0v-2h16V0h2v18h-1zm273-2h14v2h-16V0h2v16zm-32 273v15h-2v-14h-14v14h-2v-16h18v1zM0 92.1A5.02 5.02 0 0 1 6 97a5 5 0 0 1-6 4.9v-2.07a3 3 0 1 0 0-5.66V92.1zM80 272h2v32h-2v-32zm37.9 32h-2.07a3 3 0 0 0-5.66 0h-2.07a5 5 0 0 1 9.8 0zM5.9 0A5.02 5.02 0 0 1 0 5.9V3.83A3 3 0 0 0 3.83 0H5.9zm294.2 0h2.07A3 3 0 0 0 304 3.83V5.9a5 5 0 0 1-3.9-5.9zm3.9 300.1v2.07a3 3 0 0 0-1.83 1.83h-2.07a5 5 0 0 1 3.9-3.9zM97 100a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-48 32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm32 48a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm32-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm32 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16-64a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 96a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-144a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-96 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm96 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16-64a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-32 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM49 36a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-32 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm32 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM33 68a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-48a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 240a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16-64a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16-32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm80-176a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm32 48a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm112 176a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-16 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 180a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0 16a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-32a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16 0a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 84a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm32 64a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm16-16a3 3 0 1 0 0-6 3 3 0 0 0 0 6z'%3E%3C/path%3E%3C/svg%3E");
         }
-
-        .gallery {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-        }
-
-        .gallery img {
-            width: 50px;
-            height: 50px;
-            margin: 3px;
-            cursor: pointer;
-        }
-
-        .gallery img.selecionada {
-            border: 2px solid black;
-        }
-
-
-        #imagemSelecionada {
-            margin-top: 10px;
-            font-weight: bold;
-        }
     </style>
 </head>
 
@@ -112,161 +82,59 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <div class="container">
                 <div class="columns is-centered">
                     <div class="column is-6-tablet is-5-desktop is-4-widescreen">
-                        <form action="" class="box is-shadowless  is-paddingless" method="POST"
-                            enctype="multipart/form-data">
+                        <form action="" class="box is-shadowless is-paddingless" method="POST">
                             <div class="card custom-card">
                                 <div class="has-text-centered logo mt-4">
                                     <img src="assets/images/tltx-logo-roxo.png" alt="Logo">
                                 </div>
                                 <div class="card-content">
                                     <div class="field">
-                                        <label class="label">usuário</label>
+                                        <label class="label">E-mail</label>
                                         <div class="control has-icons-left">
-                                            <input class="input is-pulled-right is-static" type="text" id="usuario"
-                                                name="usuario" placeholder="Seu nome de usuário..."
-                                                value="<?php echo $_SESSION['usuario']; ?>@teletex.com.br" readonly>
+                                            <div class="field has-addons">
+                                                <p class="control is-expanded">
+                                                    <input class="input is-pulled-right" type="text" id="usuario"
+                                                        name="usuario" placeholder="seu nome..." required>
+                                                    <span class="icon is-small is-left">
+                                                        <i class="fa fa-user"></i>
+                                                    </span>
+                                                </p>
+                                                <p class="control">
+                                                    <span class="button is-static btn-login">
+                                                        @teletex.com.br
+                                                    </span>
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="field">
+                                        <label for="" class="label">Senha</label>
+                                        <div class="control has-icons-left">
+                                            <input id="senha" name="senha" type="password" placeholder="senha senha :)"
+                                                class="input" required>
                                             <span class="icon is-small is-left">
-                                                <i class="fa fa-user"></i>
+                                                <i class="fa fa-lock"></i>
                                             </span>
                                         </div>
                                     </div>
-                                    <div class="field">
-                                        <label class="label">primeiro nome</label>
-                                        <div class="control has-icons-left">
-                                            <input class="input" type="text" id="primeiro_nome" name="primeiro_nome"
-                                                placeholder="seu primeiro nome..." required>
-                                            <span class="icon is-small is-left">
-                                                <i class="fa fa-user"></i>
-                                            </span>
+                                    <?php if (isset($loginError)) { ?>
+                                        <div class="notification is-danger">
+                                            <?php echo $loginError; ?>
                                         </div>
+                                    <?php } ?>
+                                    <div class="field buttons">
+                                        <button class="button is-fullwidth is-success custom-button">
+                                            <span class="icon"><i class="gg-log-in"></i></span><span>Login</span>
+                                        </button>
                                     </div>
-                                    <div class="field">
-                                        <label class="label">segundo nome</label>
-                                        <div class="control has-icons-left">
-                                            <input class="input" type="text" id="segundo_nome" name="segundo_nome"
-                                                placeholder="seu segundo nome..." required>
-                                            <span class="icon is-small is-left">
-                                                <i class="fa fa-user"></i>
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <div class="field">
-                                        <label class="label">seu setor</label>
-                                        <div class="control">
-                                            <div class="select">
-                                                <select id="setor" name="setor" required>
-                                                    <option value="" disabled selected>selecione</option>
-                                                    <option value="Engenharia">Engenharia</option>
-                                                    <option value="Marketing">Marketing</option>
-                                                    <option value="Recursos Humanos">Recursos Humanos</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-
-                                    <div class="field">
-                                        <label class="label">imagem de perfil</label>
-                                        <div class="control">
-                                            <div class="select">
-                                                <select id="imagemOpcao" name="imagemOpcao"
-                                                    onchange="mostrarOpcaoImagem(this.value)">
-                                                    <option value="personalizada">quero usar minha foto</option>
-                                                    <option value="padrao">quero ser um fantasma</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div id="opcaoImagemPersonalizada">
-                                        <div class="field">
-                                            <label class="label">faça upload de sua imagem:</label>
-                                            <div class="control">
-                                                <input class="input" type="file" id="imagem" name="imagem"
-                                                    accept="image/*" required>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div id="opcaoImagemPadrao" style="display:none;">
-                                        <div class="field">
-                                            <label class="label">escolha um fantasma:</label>
-                                            <div class="gallery">
-                                                <img src="uploads/ghost/1.png"
-                                                    onclick="selecionarImagemPadrao(this, '1.png')" />
-                                                <img src="uploads/ghost/2.png"
-                                                    onclick="selecionarImagemPadrao(this, '2.png')" />
-                                                <img src="uploads/ghost/3.png"
-                                                    onclick="selecionarImagemPadrao(this, '3.png')" />
-                                                <img src="uploads/ghost/4.png"
-                                                    onclick="selecionarImagemPadrao(this, '4.png')" />
-                                                <img src="uploads/ghost/5.png"
-                                                    onclick="selecionarImagemPadrao(this, '5.png')" />
-                                                <img src="uploads/ghost/6.png"
-                                                    onclick="selecionarImagemPadrao(this, '6.png')" />
-                                                <img src="uploads/ghost/7.png"
-                                                    onclick="selecionarImagemPadrao(this, '7.png')" />
-                                                <img src="uploads/ghost/8.png"
-                                                    onclick="selecionarImagemPadrao(this, '8.png')" />
-                                                <img src="uploads/ghost/9.png"
-                                                    onclick="selecionarImagemPadrao(this, '9.png')" />
-                                                <img src="uploads/ghost/10.png"
-                                                    onclick="selecionarImagemPadrao(this, '10.png')" />
-                                                <img src="uploads/ghost/11.png"
-                                                    onclick="selecionarImagemPadrao(this, '11.png')" />
-                                                <img src="uploads/ghost/12.png"
-                                                    onclick="selecionarImagemPadrao(this, '12.png')" />
-                                                <img src="uploads/ghost/13.png"
-                                                    onclick="selecionarImagemPadrao(this, '13.png')" />
-                                                <img src="uploads/ghost/14.png"
-                                                    onclick="selecionarImagemPadrao(this, '14.png')" />
-                                                <img src="uploads/ghost/15.png"
-                                                    onclick="selecionarImagemPadrao(this, '15.png')" />
-                                                <img src="uploads/ghost/16.png"
-                                                    onclick="selecionarImagemPadrao(this, '16.png')" />
-                                            </div>
-                                        </div>
-                                        <div id="imagemSelecionada"></div>
-                                    </div>
-
-                                </div>
-                                <div class="field buttons">
-                                    <button class=" custom-button button is-fullwidth is-success">
-                                        <span class="icon"><i class="gg-check"></i></span><span>Registrar</span>
-                                    </button>
                                 </div>
                             </div>
+                        </form>
                     </div>
-                    </form>
                 </div>
             </div>
         </div>
-        </div>
     </section>
-    <script>
-        function mostrarOpcaoImagem(opcao) {
-            var opcaoImagemPersonalizada = document.getElementById("opcaoImagemPersonalizada");
-            var opcaoImagemPadrao = document.getElementById("opcaoImagemPadrao");
-
-            if (opcao === "personalizada") {
-                opcaoImagemPersonalizada.style.display = "block";
-                opcaoImagemPadrao.style.display = "none";
-            } else if (opcao === "padrao") {
-                opcaoImagemPersonalizada.style.display = "none";
-                opcaoImagemPadrao.style.display = "block";
-            }
-        }
-
-        function selecionarImagemPadrao(elemento, imagem) {
-            var imagens = document.querySelectorAll('.gallery img');
-            for (var i = 0; i < imagens.length; i++) {
-                imagens[i].classList.remove('selecionada');
-            }
-            elemento.classList.add('selecionada');
-            // Aqui você pode adicionar a lógica para enviar a imagem selecionada ao servidor, se necessário
-        }
-
-    </script>
 </body>
 
 </html>

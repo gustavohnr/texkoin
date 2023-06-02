@@ -1,43 +1,44 @@
 <?php
 session_start();
+require_once "php/funcoes.php";
+require_once "php/conecta_db.php";
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $primeiroNome = $_POST['primeiro_nome'];
     $segundoNome = $_POST['segundo_nome'];
     $setor = $_POST['setor'];
-    $imagem = $_FILES['imagem'];
+    $usuario = $_SESSION['usuario'];
 
-    if (!empty($primeiroNome) && !empty($segundoNome) && isset($imagem['tmp_name'])) {
-        $conn = new mysqli('localhost', 'root', '', 'tk_users');
-        if ($conn->connect_error) {
-            die('Falha na conexão com o banco de dados: ' . $conn->connect_error);
-        }
+    if (!empty($primeiroNome) && !empty($segundoNome)) {
+        $updateQuery = "UPDATE usuarios SET primeiro_nome = '$primeiroNome', segundo_nome = '$segundoNome', setor = '$setor' WHERE usuario = '$usuario'";
+        mysqli_stmt_execute(mysqli_prepare($connection, $updateQuery));
 
-        $usuario = $_SESSION['usuario'];
+        if ($_POST['img'] === 'personalizada') {
+            $imagem = $_FILES['imagem'];
+            if ($imagem['error'] === UPLOAD_ERR_OK) {
+                $nomeArquivo = uniqid() . '_' . $imagem['name'];
+                $caminhoDestino = 'uploads/' . $nomeArquivo;
 
-        if ($imagem['error'] === UPLOAD_ERR_OK) {
-            $nomeArquivo = uniqid() . '_' . $imagem['name'];
-            $caminhoDestino = 'uploads/' . $nomeArquivo;
-
-            if (move_uploaded_file($imagem['tmp_name'], $caminhoDestino)) {
-                $sql = "UPDATE usuarios SET primeiro_nome = '$primeiroNome', segundo_nome = '$segundoNome', setor = '$setor', imagem = '$nomeArquivo' WHERE usuario = '$usuario'";
-
-                if ($conn->query($sql) === TRUE) {
-                    echo "Registro atualizado com sucesso.";
-                    header("Location: dashboard.php");
-                } else {
-                    echo "Erro ao atualizar o registro: " . $conn->error;
+                if (!move_uploaded_file($imagem['tmp_name'], $caminhoDestino)) {
+                    $loginError = "Erro ao fazer o upload da imagem.";
+                    exit();
                 }
+
             } else {
-                echo "Erro ao fazer o upload da imagem.";
+                $loginError = "Erro no carregamento da imagem: " . $imagem['error'];
             }
+            $query = "UPDATE usuarios SET imagem = '$nomeArquivo' WHERE usuario = '$usuario'";
         } else {
-            echo "Erro no carregamento da imagem: " . $imagem['error'];
+            $imagem = 'ghost/' . $_POST['img'] . '.png';
+            $query = "UPDATE usuarios SET imagem = '$imagem' WHERE usuario = '$usuario'";
         }
-        $conn->close();
+        mysqli_stmt_execute(mysqli_prepare($connection, $query));
+
     } else {
-        echo "Por favor, preencha todos os campos.";
+        $loginError = "Por favor, preencha todos os campos.";
+        exit();
     }
+    header("Location: dashboard.php");
 }
 ?>
 <!DOCTYPE html>
@@ -88,20 +89,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .gallery img {
-            width: 50px;
-            height: 50px;
-            margin: 3px;
+            width: 75px;
+            height: 75px;
+            margin: 7px;
             cursor: pointer;
         }
 
         .gallery img.selecionada {
-            border: 2px solid black;
-        }
-
-
-        #imagemSelecionada {
-            margin-top: 10px;
-            font-weight: bold;
+            border: 3px solid black;
         }
     </style>
 </head>
@@ -169,10 +164,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <label class="label">imagem de perfil</label>
                                         <div class="control">
                                             <div class="select">
-                                                <select id="imagemOpcao" name="imagemOpcao"
-                                                    onchange="mostrarOpcaoImagem(this.value)">
-                                                    <option value="personalizada">quero usar minha foto</option>
-                                                    <option value="padrao">quero ser um fantasma</option>
+                                                <select id="img" name="img" onchange="mostrarOpcaoImagem(this)">
+                                                    <option id='p' value="personalizada">quero usar minha foto</option>
+                                                    <option id='g' value="padrao">quero ser um fantasma</option>
                                                 </select>
                                             </div>
                                         </div>
@@ -183,7 +177,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                             <label class="label">faça upload de sua imagem:</label>
                                             <div class="control">
                                                 <input class="input" type="file" id="imagem" name="imagem"
-                                                    accept="image/*" required>
+                                                    accept="image/*">
                                             </div>
                                         </div>
                                     </div>
@@ -192,46 +186,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                                         <div class="field">
                                             <label class="label">escolha um fantasma:</label>
                                             <div class="gallery">
-                                                <img src="uploads/ghost/1.png"
+                                                <img id='1' src="uploads/ghost/1.png"
                                                     onclick="selecionarImagemPadrao(this, '1.png')" />
-                                                <img src="uploads/ghost/2.png"
+                                                <img id='2' src="uploads/ghost/2.png"
                                                     onclick="selecionarImagemPadrao(this, '2.png')" />
-                                                <img src="uploads/ghost/3.png"
+                                                <img id='3' src="uploads/ghost/3.png"
                                                     onclick="selecionarImagemPadrao(this, '3.png')" />
-                                                <img src="uploads/ghost/4.png"
+                                                <img id='4' src="uploads/ghost/4.png"
                                                     onclick="selecionarImagemPadrao(this, '4.png')" />
-                                                <img src="uploads/ghost/5.png"
+                                                <img id='5' src="uploads/ghost/5.png"
                                                     onclick="selecionarImagemPadrao(this, '5.png')" />
-                                                <img src="uploads/ghost/6.png"
+                                                <img id='6' src="uploads/ghost/6.png"
                                                     onclick="selecionarImagemPadrao(this, '6.png')" />
-                                                <img src="uploads/ghost/7.png"
-                                                    onclick="selecionarImagemPadrao(this, '7.png')" />
-                                                <img src="uploads/ghost/8.png"
-                                                    onclick="selecionarImagemPadrao(this, '8.png')" />
-                                                <img src="uploads/ghost/9.png"
-                                                    onclick="selecionarImagemPadrao(this, '9.png')" />
-                                                <img src="uploads/ghost/10.png"
-                                                    onclick="selecionarImagemPadrao(this, '10.png')" />
-                                                <img src="uploads/ghost/11.png"
-                                                    onclick="selecionarImagemPadrao(this, '11.png')" />
-                                                <img src="uploads/ghost/12.png"
-                                                    onclick="selecionarImagemPadrao(this, '12.png')" />
-                                                <img src="uploads/ghost/13.png"
-                                                    onclick="selecionarImagemPadrao(this, '13.png')" />
-                                                <img src="uploads/ghost/14.png"
-                                                    onclick="selecionarImagemPadrao(this, '14.png')" />
-                                                <img src="uploads/ghost/15.png"
-                                                    onclick="selecionarImagemPadrao(this, '15.png')" />
-                                                <img src="uploads/ghost/16.png"
-                                                    onclick="selecionarImagemPadrao(this, '16.png')" />
                                             </div>
                                         </div>
-                                        <div id="imagemSelecionada"></div>
                                     </div>
 
                                 </div>
-                                <div class="field buttons">
-                                    <button class=" custom-button button is-fullwidth is-success">
+                                <?php if (isset($loginError)) { ?>
+                                    <div class="notification is-danger">
+                                        <?php echo $loginError; ?>
+                                    </div>
+                                <?php } ?>
+                                <div class="field buttons has-text-centered d-block" style="
+                                                                                    display: block; !important">
+                                    <button class=" custom-button button is-success">
                                         <span class="icon"><i class="gg-check"></i></span><span>Registrar</span>
                                     </button>
                                 </div>
@@ -247,11 +226,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         function mostrarOpcaoImagem(opcao) {
             var opcaoImagemPersonalizada = document.getElementById("opcaoImagemPersonalizada");
             var opcaoImagemPadrao = document.getElementById("opcaoImagemPadrao");
+            var selecionada = opcao.options[opcao.selectedIndex];
+            var id = selecionada.id;
 
-            if (opcao === "personalizada") {
+            if (id === 'p') {
                 opcaoImagemPersonalizada.style.display = "block";
                 opcaoImagemPadrao.style.display = "none";
-            } else if (opcao === "padrao") {
+            } else if (id === 'g') {
                 opcaoImagemPersonalizada.style.display = "none";
                 opcaoImagemPadrao.style.display = "block";
             }
@@ -263,7 +244,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 imagens[i].classList.remove('selecionada');
             }
             elemento.classList.add('selecionada');
-            // Aqui você pode adicionar a lógica para enviar a imagem selecionada ao servidor, se necessário
+            document.getElementById('g').value = elemento.id;
         }
 
     </script>

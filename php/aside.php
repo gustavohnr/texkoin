@@ -82,7 +82,7 @@
             aria-hidden="true" id="iconSidenav"></i>
         <a class="px-3 " target="_blank">
             <img src="assets/images/tltx-logo-roxo-t.png" class="navbar-brand-img h-100" alt="main_logo">
-            <span class="ms-1 font-weight-bold">TEXKOINS</span>
+            <span class="ms-1 font-weight-bold"></span>
         </a>
         </div>
     </div>

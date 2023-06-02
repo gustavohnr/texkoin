@@ -7,28 +7,16 @@ requireLogin();
 
 $usuario = $_SESSION['usuario'];
 
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $primeiroNome = $_POST['primeiro_nome'];
     $segundoNome = $_POST['segundo_nome'];
     $setor = $_POST['setor'];
     $cargo = $_POST['cargo'];
-    echo 'a';
-    var_dump($_POST);
-
 
     if (!empty($primeiroNome) && !empty($segundoNome)) {
-        $updateQuery = "UPDATE usuarios SET primeiro_nome = '$primeiroNome', segundo_nome = '$segundoNome', , cargo = '$cargo', setor = '$setor' WHERE usuario = '$usuario'";
+        $updateQuery = "UPDATE usuarios SET primeiro_nome = '$primeiroNome', segundo_nome = '$segundoNome', cargo = '$cargo', setor = '$setor' WHERE usuario = '$usuario'";
         mysqli_stmt_execute(mysqli_prepare($connection, $updateQuery));
 
-        echo 'b';
-        exit();
-
-        if (mysqli_affected_rows($connection) > 0) {
-            echo "Inserção bem-sucedida!";
-        } else {
-            echo "Falha na inserção.";
-        }
         // if ($_POST['img'] === 'personalizada') {
         //     $imagem = $_FILES['imagem'];
         //     if ($imagem['error'] === UPLOAD_ERR_OK) {
@@ -306,7 +294,7 @@ try {
                                     <tr>
                                         <td class="text-left h6 font-weight-300">TEXKOINS</td>
                                         <td class="setor-t text-center font-weight-normal">
-                                            <?php echo $totalTexkoins ?>
+                                            <?php echo $tkSetor ?>
                                         </td>
                                     </tr>
                                 </table>
